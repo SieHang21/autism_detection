@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Resize to 280×280</title>
+<style>
+  :root{
+    --bg:#0b1220;
+    --card:#111827cc;
+    --card-edge:#1f2937;
+    --accent:#60a5fa;
+    --accent-2:#34d399;
+    --text:#e5e7eb;
+    --muted:#9ca3af;
+    --danger:#ef4444;
+    --shadow:0 10px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;min-height:100vh;background:
+      radial-gradient(1200px 600px at 20% -10%, #1f2937 5%, transparent 40%),
+      radial-gradient(1000px 500px at 120% 10%, #0f172a 5%, transparent 40%),
+      var(--bg);
+    color:var(--text);font-family:Inter,Segoe UI,Roboto,system-ui,Arial,sans-serif;
+  }
+  .wrap{max-width:1200px;margin:0 auto;padding:24px}
+  .header{display:flex;align-items:center;gap:12px;justify-content:space-between;margin-bottom:16px}
+  .back{color:var(--muted);text-decoration:none;border:1px solid #334155;padding:8px 12px;border-radius:10px;backdrop-filter:blur(6px)}
+  .title{display:flex;align-items:center;gap:10px}
+  .title h1{font-size:22px;margin:0}
+  .badge{font-size:12px;color:#cbd5e1;border:1px solid #334155;padding:4px 8px;border-radius:999px}
+  .card{
+    background:linear-gradient(180deg, rgba(17,24,39,.85), rgba(2,6,23,.7));
+    border:1px solid var(--card-edge);
+    border-radius:16px;padding:18px;box-shadow:var(--shadow);
+    backdrop-filter: blur(8px);
+  }
+  .toolbar{
+    display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;margin-bottom:14px
+  }
+  .btn, .input, .range{
+    border:1px solid #334155;background:#0b1220;padding:10px 12px;border-radius:12px;color:var(--text);
+    transition:.2s;box-shadow: inset 0 0 0 1px rgba(255,255,255,.02)
+  }
+  .btn:hover{background:#0f172a}
+  .btn.primary{background:linear-gradient(90deg,#2563eb,#7c3aed);border:none}
+  .btn.ghost{background:transparent}
+  .btn.small{padding:8px 10px}
+  .toolbar .group{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .label{font-size:12px;color:var(--muted);padding:6px 10px;border:1px dashed #334155;border-radius:999px}
+  .pill{font-size:12px;color:#111827;background:#93c5fd;padding:4px 8px;border-radius:999px}
+  .stageWrap{
+    position:relative;border:1px solid #334155;border-radius:16px;background: #0b1220;
+    height:min(60vh,620px);display:flex;align-items:center;justify-content:center;overflow:hidden
+  }
+  #stage{max-width:100%;max-height:100%;border-radius:12px}
+  #overlay{position:absolute;inset:0;pointer-events:none}
+  .grid{
+    position:absolute;left:50%;top:50%;width:280px;height:280px;transform:translate(-50%,-50%);
+    border:2px solid var(--accent);border-radius:10px;box-shadow:0 0 0 2000px rgba(0,0,0,0.45) inset
+  }
+  .crosshair:before,.crosshair:after{
+    content:"";position:absolute;background:rgba(96,165,250,.7)
+  }
+  .crosshair:before{left:50%;top:calc(50% - 140px);width:1px;height:280px;transform:translateX(-.5px)}
+  .crosshair:after{top:50%;left:calc(50% - 140px);height:1px;width:280px;transform:translateY(-.5px)}
+  .footer{
+    position:sticky;bottom:0;margin-top:16px;background:#0b1220b3;border:1px solid #334155;border-radius:14px;
+    padding:12px;display:flex;gap:10px;justify-content:center;backdrop-filter:blur(8px)
+  }
+  .hint{color:var(--muted);text-align:center;margin:10px 0 0;font-size:13px}
+  .switch{display:flex;gap:8px;align-items:center}
+  .switch input{accent-color:#60a5fa;transform:scale(1.1)}
+  .kbd{display:inline-block;padding:2px 6px;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#cbd5e1;font-size:12px}
+  .zoom-readout{font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <a class="back" href="/">← Back</a>
+      <div class="title">
+        <h1>Resize Image to 280×280</h1>
+        <span class="badge">Canvas crop • Hi‑quality</span>
+      </div>
+      <div class="pill">Keyboard: <span class="kbd">←</span> <span class="kbd">→</span> <span class="kbd">↑</span> <span class="kbd">↓</span>, Zoom <span class="kbd">+</span>/<span class="kbd">−</span></div>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <div class="group">
+          <input id="fileInput" class="input" type="file" accept="image/*"/>
+          <button id="loadSample" class="btn">Load Sample</button>
+          <span class="label">Target: 280×280</span>
+        </div>
+
+        <div class="group">
+          <span class="label">Zoom</span>
+          <button id="zoomOut" class="btn small">−</button>
+          <input id="zoomSlider" class="range" type="range" min="0.1" max="5" step="0.01" value="1" style="width:180px"/>
+          <button id="zoomIn" class="btn small">+</button>
+          <span id="zoomValue" class="pill zoom-readout">100%</span>
+          <button id="resetView" class="btn ghost">Reset</button>
+        </div>
+
+        <div class="group">
+          <div class="switch">
+            <input type="checkbox" id="showCross"/>
+            <label for="showCross">Center guides</label>
+          </div>
+          <div class="switch">
+            <input type="checkbox" id="grayMode"/>
+            <label for="grayMode">Grayscale preview</label>
+          </div>
+          <div class="switch">
+            <label for="brightness">Brightness</label>
+            <input id="brightness" type="range" min="0.6" max="1.4" step="0.02" value="1"/>
+          </div>
+        </div>
+      </div>
+
+      <div class="stageWrap">
+        <canvas id="stage" width="900" height="540"></canvas>
+        <div id="overlay">
+          <div class="grid" id="grid"></div>
+        </div>
+      </div>
+
+      <p class="hint">Drag to pan. Wheel or +/− to zoom. Keep the subject inside the blue box for a perfect 280×280 export. </p>
+    </div>
+
+    <div class="footer">
+      <button id="downloadPng" class="btn primary" disabled>⬇ PNG 280×280</button>
+      <button id="downloadJpg" class="btn" disabled>⬇ JPEG 280×280</button>
+      <button id="copyClipboard" class="btn" disabled>📋 Copy PNG</button>
+    </div>
+  </div>
+
+<script>
+  const stage = document.getElementById('stage');
+  const ctx = stage.getContext('2d');
+  const fileInput = document.getElementById('fileInput');
+  const loadSample = document.getElementById('loadSample');
+  const zoomSlider = document.getElementById('zoomSlider');
+  const zoomIn = document.getElementById('zoomIn');
+  const zoomOut = document.getElementById('zoomOut');
+  const resetView = document.getElementById('resetView');
+  const dlPNG = document.getElementById('downloadPng');
+  const dlJPG = document.getElementById('downloadJpg');
+  const copyBtn = document.getElementById('copyClipboard');
+  const zoomValue = document.getElementById('zoomValue');
+  const showCross = document.getElementById('showCross');
+  const grayMode = document.getElementById('grayMode');
+  const brightness = document.getElementById('brightness');
+  const grid = document.getElementById('grid');
+
+  let img = new Image();
+  let imgLoaded = false;
+  let scale = 1, minScale = 0.1, maxScale = 5;
+  let offsetX = 0, offsetY = 0;
+  let isDragging = false, lastX = 0, lastY = 0;
+
+  const target = {
+    w: 280, h: 280,
+    get x(){ return (stage.width - this.w)/2 },
+    get y(){ return (stage.height - this.h)/2 }
+  };
+
+  function enableActions(v){
+    dlPNG.disabled = !v; dlJPG.disabled = !v; copyBtn.disabled = !v;
+  }
+  function updateZoomReadout(){
+    zoomValue.textContent = Math.round(scale*100) + '%';
+  }
+
+  function fitToStage(){
+    if(!imgLoaded) return;
+    const cover = Math.max(target.w / img.width, target.h / img.height);
+    scale = Math.max(cover, 0.1);
+    offsetX = target.x + target.w/2 - (img.width * scale)/2;
+    offsetY = target.y + target.h/2 - (img.height * scale)/2;
+    zoomSlider.value = scale.toFixed(2);
+    updateZoomReadout();
+    render();
+  }
+
+  function clampPan(){
+    const vw = img.width * scale, vh = img.height * scale;
+    const minX = target.x + target.w - vw, maxX = target.x;
+    const minY = target.y + target.h - vh, maxY = target.y;
+    offsetX = Math.min(Math.max(offsetX, minX), maxX);
+    offsetY = Math.min(Math.max(offsetY, minY), maxY);
+  }
+
+  function zoomAt(cx, cy, factor){
+    if(!imgLoaded) return;
+    const prev = scale;
+    scale = Math.min(Math.max(scale*factor, minScale), maxScale);
+    const k = scale/prev;
+    offsetX = cx - (cx - offsetX)*k;
+    offsetY = cy - (cy - offsetY)*k;
+    clampPan();
+    zoomSlider.value = scale.toFixed(2);
+    updateZoomReadout();
+    render();
+  }
+
+  function render(){
+    ctx.save();
+    ctx.clearRect(0,0,stage.width,stage.height);
+    ctx.fillStyle = '#0b1220';
+    ctx.fillRect(0,0,stage.width,stage.height);
+
+    if(imgLoaded){
+      // preview effects
+      ctx.filter = `${grayMode.checked ? 'grayscale(1)' : 'none'} brightness(${brightness.value})`;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, img.width, img.height, offsetX, offsetY, img.width*scale, img.height*scale);
+      ctx.filter = 'none';
+
+      ctx.save();
+      ctx.strokeStyle = '#60a5fa';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(target.x, target.y, target.w, target.h);
+      if(showCross.checked){
+        ctx.strokeStyle = 'rgba(96,165,250,.7)';
+        ctx.beginPath();
+        ctx.moveTo(target.x + target.w/2, target.y); ctx.lineTo(target.x + target.w/2, target.y + target.h);
+        ctx.moveTo(target.x, target.y + target.h/2); ctx.lineTo(target.x + target.w, target.y + target.h/2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  // Mouse
+  stage.addEventListener('mousedown', e => {
+    if(!imgLoaded) return; isDragging = true; lastX = e.offsetX; lastY = e.offsetY;
+  });
+  stage.addEventListener('mousemove', e => {
+    if(!imgLoaded || !isDragging) return;
+    offsetX += e.offsetX - lastX; offsetY += e.offsetY - lastY;
+    lastX = e.offsetX; lastY = e.offsetY; clampPan(); render();
+  });
+  ['mouseup','mouseleave'].forEach(ev => stage.addEventListener(ev, () => isDragging=false));
+
+  // Wheel zoom
+  stage.addEventListener('wheel', e => {
+    if(!imgLoaded) return;
+    e.preventDefault();
+    const r = stage.getBoundingClientRect();
+    const cx = e.clientX - r.left, cy = e.clientY - r.top;
+    zoomAt(cx, cy, e.deltaY < 0 ? 1.1 : 0.9);
+  }, {passive:false});
+
+  // Controls
+  zoomIn.addEventListener('click', () => zoomAt(stage.width/2, stage.height/2, 1.15));
+  zoomOut.addEventListener('click', () => zoomAt(stage.width/2, stage.height/2, 0.85));
+  zoomSlider.addEventListener('input', () => {
+    if(!imgLoaded) return;
+    const t = parseFloat(zoomSlider.value);
+    const factor = t / scale;
+    zoomAt(stage.width/2, stage.height/2, factor);
+  });
+  resetView.addEventListener('click', fitToStage);
+  showCross.addEventListener('change', render);
+  grayMode.addEventListener('change', render);
+  brightness.addEventListener('input', render);
+
+  // Keyboard shortcuts
+  window.addEventListener('keydown', e => {
+    if(!imgLoaded) return;
+    const step = 10;
+    if(e.key === 'ArrowLeft'){ offsetX += -step; }
+    if(e.key === 'ArrowRight'){ offsetX += step; }
+    if(e.key === 'ArrowUp'){ offsetY += -step; }
+    if(e.key === 'ArrowDown'){ offsetY += step; }
+    if(e.key === '+' || e.key === '='){ zoomAt(stage.width/2, stage.height/2, 1.1); }
+    if(e.key === '-' || e.key === '_'){ zoomAt(stage.width/2, stage.height/2, 0.9); }
+    clampPan(); render();
+  });
+
+  // File loading
+  fileInput.addEventListener('change', () => {
+    const f = fileInput.files[0]; if(!f) return;
+    const url = URL.createObjectURL(f);
+    img.onload = () => { imgLoaded = true; enableActions(true); fitToStage(); URL.revokeObjectURL(url); };
+    img.src = url;
+  });
+
+  // Sample
+  loadSample.addEventListener('click', () => {
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="900" height="540">
+        <defs><linearGradient id="g" x1="0" x2="1"><stop offset="0%" stop-color="#4f46e5"/><stop offset="100%" stop-color="#06b6d4"/></linearGradient></defs>
+        <rect width="100%" height="100%" fill="url(#g)"/>
+        <circle cx="450" cy="270" r="120" fill="rgba(255,255,255,.2)"/>
+        <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Inter, Segoe UI" font-size="46" fill="#fff" opacity="0.95">Sample Image</text>
+      </svg>`;
+    img.onload = () => { imgLoaded = true; enableActions(true); fitToStage(); };
+    img.src = 'data:image/svg+xml;base64,' + btoa(svg);
+  });
+
+  function exportCropped(mime='image/png', quality=0.95){
+    if(!imgLoaded) return null;
+    const sx = (target.x - offsetX)/scale;
+    const sy = (target.y - offsetY)/scale;
+    const sw = target.w/scale;
+    const sh = target.h/scale;
+
+    const out = document.createElement('canvas');
+    out.width = target.w; out.height = target.h;
+    const octx = out.getContext('2d');
+    octx.imageSmoothingEnabled = true;
+    octx.imageSmoothingQuality = 'high';
+    // Apply same preview filters to export for WYSIWYG if desired:
+    // octx.filter = `${grayMode.checked ? 'grayscale(1)' : 'none'} brightness(${brightness.value})`;
+    octx.drawImage(img, sx, sy, sw, sh, 0, 0, target.w, target.h);
+    return out.toDataURL(mime, quality);
+  }
+
+  dlPNG.addEventListener('click', () => {
+    const url = exportCropped('image/png');
+    if(!url) return;
+    const a = document.createElement('a'); a.href = url; a.download = 'resized_280x280.png'; a.click();
+  });
+  dlJPG.addEventListener('click', () => {
+    const url = exportCropped('image/jpeg', 0.95);
+    if(!url) return;
+    const a = document.createElement('a'); a.href = url; a.download = 'resized_280x280.jpg'; a.click();
+  });
+  copyBtn.addEventListener('click', async () => {
+    const url = exportCropped('image/png'); if(!url) return;
+    const blob = await (await fetch(url)).blob();
+    try{
+      await navigator.clipboard.write([new ClipboardItem({[blob.type]: blob})]);
+      copyBtn.textContent = '✅ Copied'; setTimeout(()=> copyBtn.textContent='📋 Copy PNG', 1200);
+    }catch{ alert('Clipboard not supported'); }
+  });
+
+  // Initialize
+  zoomSlider.value = '1.00'; updateZoomReadout(); render();
+</script>
+</body>
+</html>

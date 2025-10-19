@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autism Detection System - AI Analysis</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 30px 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.95;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .upload-area {
+            background: #f8f9fa;
+            border: 3px dashed #dee2e6;
+            border-radius: 16px;
+            padding: 40px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            margin-bottom: 30px;
+        }
+
+        .upload-area:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #667eea;
+            background: #e8eeff;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .upload-text {
+            font-size: 1.2em;
+            color: #495057;
+            margin-bottom: 10px;
+        }
+
+        .upload-hint {
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+
+        #imageInput {
+            display: none;
+        }
+
+        /* FIXED: Better alignment */
+        .controls {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+            align-items: flex-end;  /* Perfect bottom alignment */
+        }
+
+        .model-selector {
+            flex: 1;
+        }
+
+        .model-selector label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #495057;
+        }
+
+        .model-selector select {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #dee2e6;
+            border-radius: 10px;
+            font-size: 1em;
+            background: white;
+            cursor: pointer;
+            transition: border-color 0.3s;
+            height: 50px;
+        }
+
+        .model-selector select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .analyze-btn {
+            flex: 1;
+            padding: 14px 32px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 6px rgba(102, 126, 234, 0.3);
+            height: 50px;
+        }
+
+        .analyze-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .analyze-btn:active {
+            transform: translateY(0);
+        }
+
+        .analyze-btn:disabled {
+            background: #adb5bd;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 1.1em;
+            color: #495057;
+        }
+
+        .results {
+            display: none;
+        }
+
+        .result-card {
+            background: #f8f9fa;
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 24px;
+            border-left: 6px solid #667eea;
+        }
+
+        .result-card.ensemble {
+            border-left-color: #28a745;
+            background: linear-gradient(135deg, #f0fff4 0%, #f8f9fa 100%);
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .model-name {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: #212529;
+        }
+
+        .confidence-badge {
+            padding: 10px 20px;
+            border-radius: 24px;
+            font-weight: 700;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .confidence-badge.high {
+            background: #d4edda;
+            color: #155724;
+            box-shadow: 0 2px 8px rgba(21, 87, 36, 0.2);
+        }
+
+        .confidence-badge.medium {
+            background: #fff3cd;
+            color: #856404;
+            box-shadow: 0 2px 8px rgba(133, 100, 4, 0.2);
+        }
+
+        .confidence-badge.low {
+            background: #f8d7da;
+            color: #721c24;
+            box-shadow: 0 2px 8px rgba(114, 28, 36, 0.2);
+        }
+
+        .confidence-badge.very_low {
+            background: #e2e3e5;
+            color: #383d41;
+            box-shadow: 0 2px 8px rgba(56, 61, 65, 0.2);
+        }
+
+        .prediction-main {
+            background: white;
+            border-radius: 12px;
+            padding: 32px;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        .prediction-label {
+            font-size: 2.2em;
+            font-weight: 800;
+            margin-bottom: 12px;
+        }
+
+        .prediction-label.autistic {
+            color: #dc3545;
+        }
+
+        .prediction-label.non-autistic {
+            color: #28a745;
+        }
+
+        .prediction-label.uncertain {
+            color: #ffc107;
+        }
+
+        .confidence-score {
+            font-size: 1.6em;
+            color: #6c757d;
+            margin-bottom: 24px;
+        }
+
+        .percentage-display {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 24px;
+        }
+
+        .percentage-item {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        .percentage-label {
+            font-weight: 700;
+            margin-bottom: 12px;
+            font-size: 1.05em;
+            color: #495057;
+        }
+
+        .percentage-bar {
+            height: 36px;
+            background: #e9ecef;
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .percentage-fill {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            font-size: 1em;
+        }
+
+        .percentage-fill.autistic {
+            background: linear-gradient(90deg, #dc3545 0%, #c82333 100%);
+        }
+
+        .percentage-fill.non-autistic {
+            background: linear-gradient(90deg, #28a745 0%, #218838 100%);
+        }
+
+        .alert {
+            padding: 16px 20px;
+            border-radius: 10px;
+            margin: 16px 0;
+        }
+
+        .alert-warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            color: #856404;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+            color: #721c24;
+        }
+
+        .alert h4 {
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
+        .alert ul {
+            margin-left: 20px;
+            margin-top: 8px;
+        }
+
+        .details-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #dee2e6;
+        }
+
+        .detail-item {
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+        }
+
+        .detail-label {
+            font-size: 0.85em;
+            color: #6c757d;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .detail-value {
+            font-size: 1.1em;
+            font-weight: 700;
+            color: #212529;
+        }
+
+        .image-preview {
+            text-align: center;
+            margin-top: 32px;
+            padding-top: 32px;
+            border-top: 2px solid #dee2e6;
+        }
+
+        .image-preview img {
+            max-width: 100%;
+            max-height: 500px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .footer-actions {
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 2px solid #dee2e6;
+            text-align: center;
+        }
+
+        .resize-btn {
+            display: inline-block;
+            padding: 16px 40px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 12px;
+            font-size: 1.1em;
+            font-weight: 600;
+            transition: all 0.3s;
+            box-shadow: 0 4px 6px rgba(245, 87, 108, 0.3);
+        }
+
+        .resize-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 12px rgba(245, 87, 108, 0.4);
+        }
+
+        .resize-btn:active {
+            transform: translateY(0);
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .controls {
+                flex-direction: column;
+            }
+
+            .percentage-display {
+                grid-template-columns: 1fr;
+            }
+
+            .details-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧠 Autism Detection System</h1>
+            <p>Advanced AI-Powered Facial Analysis with Multi-Model Ensemble</p>
+        </div>
+
+        <div class="content">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📤</div>
+                <div class="upload-text">Click to upload or drag and drop</div>
+                <div class="upload-hint">Supported formats: PNG, JPG, JPEG, GIF, BMP (Max 16MB)</div>
+                <input type="file" id="imageInput" accept="image/*">
+            </div>
+
+            <div class="controls">
+                <div class="model-selector">
+                    <label for="modelChoice">Select Analysis Model:</label>
+                    <select id="modelChoice">
+                        <option value="both">🔥 Ensemble (Recommended)</option>
+                        <option value="model1">ResNet50 Model</option>
+                        <option value="vgg16">VGG16 Model</option>
+                    </select>
+                </div>
+                <button class="analyze-btn" id="analyzeBtn" disabled>
+                    🔍 Analyze Image
+                </button>
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <div class="loading-text">Analyzing image with AI models...</div>
+            </div>
+
+            <div class="results" id="results"></div>
+
+            <div class="image-preview" id="imagePreview"></div>
+
+            <div class="footer-actions">
+                <a href="/resize" class="resize-btn">
+                    🖼️ Image Resize Tool
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const imageInput = document.getElementById('imageInput');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const loading = document.getElementById('loading');
+        const results = document.getElementById('results');
+        const imagePreview = document.getElementById('imagePreview');
+        const modelChoice = document.getElementById('modelChoice');
+
+        let selectedFile = null;
+
+        uploadArea.addEventListener('click', () => imageInput.click());
+
+        imageInput.addEventListener('change', function(e) {
+            handleFile(e.target.files[0]);
+        });
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            handleFile(e.dataTransfer.files[0]);
+        });
+
+        function handleFile(file) {
+            if (!file) return;
+
+            const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/bmp'];
+            if (!validTypes.includes(file.type)) {
+                alert('Please upload a valid image file (PNG, JPG, JPEG, GIF, BMP)');
+                return;
+            }
+
+            selectedFile = file;
+            uploadArea.querySelector('.upload-text').textContent = `✅ ${file.name}`;
+            uploadArea.style.borderColor = '#28a745';
+            uploadArea.style.background = '#d4edda';
+            analyzeBtn.disabled = false;
+        }
+
+        analyzeBtn.addEventListener('click', async function() {
+            if (!selectedFile) return;
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('model', modelChoice.value);
+
+            analyzeBtn.disabled = true;
+            loading.style.display = 'block';
+            results.style.display = 'none';
+            imagePreview.innerHTML = '';
+
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                loading.style.display = 'none';
+                displayResults(data);
+            } catch (error) {
+                loading.style.display = 'none';
+                displayError(error.message);
+            }
+
+            analyzeBtn.disabled = false;
+        });
+
+        function displayResults(data) {
+            results.innerHTML = '';
+
+            if (data.error) {
+                results.innerHTML = `
+                    <div class="alert alert-error">
+                        <h4>❌ Error</h4>
+                        <p>${data.error}</p>
+                    </div>
+                `;
+                results.style.display = 'block';
+                return;
+            }
+
+            if (data.status === 'no_face') {
+                results.innerHTML = `
+                    <div class="alert alert-warning">
+                        <h4>⚠️ No Face Detected</h4>
+                        <p>${data.message}</p>
+                        <ul>
+                            <li>Ensure the image contains a clear, visible human face</li>
+                            <li>Make sure the face is well-lit and not obscured</li>
+                            <li>Try using a frontal photo of the face</li>
+                        </ul>
+                    </div>
+                `;
+                results.style.display = 'block';
+                if (data.image_data) {
+                    imagePreview.innerHTML = `<img src="data:image/jpeg;base64,${data.image_data}" alt="Uploaded">`;
+                }
+                return;
+            }
+
+            if (data.status === 'not_human_face') {
+                let detailsHtml = '';
+                if (data.details && data.details.length > 0) {
+                    detailsHtml = `
+                        <div style="background: white; padding: 16px; border-radius: 8px; margin-top: 12px;">
+                            <h5 style="margin-bottom: 8px; font-weight: 700;">Detection Issues:</h5>
+                            <ul>${data.details.map(d => `<li>${d}</li>`).join('')}</ul>
+                        </div>
+                    `;
+                }
+
+                results.innerHTML = `
+                    <div class="alert alert-error">
+                        <h4>🚫 Invalid Image Type</h4>
+                        <p style="font-weight: 600; margin-bottom: 12px;">${data.message}</p>
+                        <p><strong>This system analyzes human faces only.</strong></p>
+                        <p style="margin-top: 8px;">Cannot process:</p>
+                        <ul>
+                            <li>Animals (cats, dogs, etc.)</li>
+                            <li>Cartoons, drawings, or illustrations</li>
+                            <li>Documents or text images</li>
+                            <li>Objects, flowers, or landscapes</li>
+                            <li>Extremely blurry photographs</li>
+                        </ul>
+                        ${detailsHtml}
+                        <div style="background: white; padding: 12px; border-radius: 8px; margin-top: 12px; text-align: center;">
+                            <strong>Verification Confidence:</strong>
+                            <span style="color: #dc3545; font-size: 1.2em; font-weight: 700;">${(data.confidence * 100).toFixed(0)}%</span>
+                            <br><small style="color: #6c757d;">(Minimum 25% required)</small>
+                        </div>
+                    </div>
+                `;
+                results.style.display = 'block';
+                if (data.image_data) {
+                    imagePreview.innerHTML = `<img src="data:image/jpeg;base64,${data.image_data}" alt="Uploaded">`;
+                }
+                return;
+            }
+
+            if (data.status === 'quality_error') {
+                results.innerHTML = `
+                    <div class="alert alert-error">
+                        <h4>❌ Image Quality Issue</h4>
+                        <p>${data.message}</p>
+                    </div>
+                `;
+                results.style.display = 'block';
+                return;
+            }
+
+            if (data.ensemble) {
+                results.innerHTML += createResultCard(data.ensemble, '🎯 Ensemble Result', true);
+            }
+
+            if (data.model1) {
+                results.innerHTML += createResultCard(data.model1, '🔬 ResNet50 Model', false);
+            }
+
+            if (data.vgg16) {
+                results.innerHTML += createResultCard(data.vgg16, '🔬 VGG16 Model', false);
+            }
+
+            results.style.display = 'block';
+
+            if (data.image_data) {
+                imagePreview.innerHTML = `<img src="data:image/jpeg;base64,${data.image_data}" alt="Analyzed">`;
+            }
+        }
+
+        function createResultCard(result, title, isEnsemble) {
+            const predictedClass = result.predicted_class || '';
+            const isAutistic = predictedClass.toLowerCase().includes('autistic') && !predictedClass.toLowerCase().includes('non');
+            const isUncertain = predictedClass.toLowerCase().includes('uncertain') || predictedClass.toLowerCase().includes('possibly') || predictedClass.toLowerCase().includes('likely');
+
+            let labelClass = 'uncertain';
+            if (!isUncertain) {
+                labelClass = isAutistic ? 'autistic' : 'non-autistic';
+            }
+
+            const tier = result.confidence_tier || 'medium';
+            const confidence = (result.confidence * 100).toFixed(1);
+
+            let warningsHtml = '';
+            if (result.ood_warning) {
+                warningsHtml = `
+                    <div class="alert alert-warning">
+                        <h4>⚠️ Reliability Notice</h4>
+                        <p>${result.ood_warning}</p>
+                    </div>
+                `;
+            }
+
+            if (result.quality_warnings && result.quality_warnings.length > 0) {
+                warningsHtml += `
+                    <div class="alert alert-warning">
+                        <h4>⚠️ Image Warnings</h4>
+                        <ul>${result.quality_warnings.map(w => `<li>${w}</li>`).join('')}</ul>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="result-card ${isEnsemble ? 'ensemble' : ''}">
+                    <div class="result-header">
+                        <div class="model-name">${title}</div>
+                        <div class="confidence-badge ${tier}">${tier.toUpperCase()}</div>
+                    </div>
+
+                    <div class="prediction-main">
+                        <div class="prediction-label ${labelClass}">${predictedClass}</div>
+                        <div class="confidence-score">Confidence: ${confidence}%</div>
+
+                        <div class="percentage-display">
+                            <div class="percentage-item">
+                                <div class="percentage-label">Autistic</div>
+                                <div class="percentage-bar">
+                                    <div class="percentage-fill autistic" style="width: ${result.autistic_percentage}%">
+                                        ${result.autistic_percentage}%
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="percentage-item">
+                                <div class="percentage-label">Non-Autistic</div>
+                                <div class="percentage-bar">
+                                    <div class="percentage-fill non-autistic" style="width: ${result.non_autistic_percentage}%">
+                                        ${result.non_autistic_percentage}%
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    ${warningsHtml}
+
+                    <div class="details-grid">
+                        ${result.entropy ? `
+                            <div class="detail-item">
+                                <div class="detail-label">Entropy</div>
+                                <div class="detail-value">${result.entropy.toFixed(3)}</div>
+                            </div>
+                        ` : ''}
+                        ${result.input_size ? `
+                            <div class="detail-item">
+                                <div class="detail-label">Input Size</div>
+                                <div class="detail-value">${result.input_size}</div>
+                            </div>
+                        ` : ''}
+                        ${result.tta_views ? `
+                            <div class="detail-item">
+                                <div class="detail-label">TTA Views</div>
+                                <div class="detail-value">${result.tta_views}</div>
+                            </div>
+                        ` : ''}
+                        ${result.ensemble_method ? `
+                            <div class="detail-item">
+                                <div class="detail-label">Method</div>
+                                <div class="detail-value">${result.ensemble_method.replace(/_/g, ' ')}</div>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        function displayError(message) {
+            results.innerHTML = `
+                <div class="alert alert-error">
+                    <h4>❌ Error</h4>
+                    <p>${message}</p>
+                </div>
+            `;
+            results.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
