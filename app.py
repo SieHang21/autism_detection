@@ -52,8 +52,8 @@ def download_model_from_gdrive(file_id, output_path):
     
     try:
         log.info(f"Downloading {output_path} from Google Drive (this may take 2-5 minutes)...")
-        url = f"https://drive.google.com/uc?id={file_id}"
-        gdown.download(url, output_path, quiet=False)
+        url = f"https://drive.google.com/uc?export=download&id={file_id}"
+        gdown.download(url, output_path, quiet=False, fuzzy=True)
         
         if os.path.exists(output_path):
             log.info(f"✓ Successfully downloaded {output_path}")
@@ -865,8 +865,8 @@ def predict():
         log.error(f"Server error: {e}")
         return jsonify({'error': f'Server error: {str(e)}'})
 
-# if __name__ == '__main__':
-#     app.run(debug=True, host='0.0.0.0', port=5000, threaded=True)
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 10000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(debug=True, host='0.0.0.0', port=5000, threaded=True)
+# if __name__ == '__main__':
+#     port = int(os.environ.get('PORT', 10000))
+#     app.run(host='0.0.0.0', port=port)
