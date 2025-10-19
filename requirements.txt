@@ -7,5 +7,3 @@ mtcnn==1.0.0
 Werkzeug==3.0.3
 gunicorn==21.2.0
 gdown==4.7.1
-ml_dtypes==0.2.0
-
