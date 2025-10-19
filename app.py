@@ -12,10 +12,10 @@ import tensorflow as tf
 from tensorflow.keras.applications.vgg16 import preprocess_input as vgg16_preprocess
 from tensorflow.keras.applications.resnet import preprocess_input as resnet_preprocess
 import cv2
+import gdown
 
 try:
     from mtcnn import MTCNN
-
     MTCNN_AVAILABLE = True
 except ImportError:
     MTCNN_AVAILABLE = False
@@ -38,11 +38,29 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp'}
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+# ===== DOWNLOAD MODELS FROM GOOGLE DRIVE =====
+def download_model(gdrive_id, output_path):
+    if not os.path.exists(output_path):
+        log.info(f"Downloading {output_path} from Google Drive...")
+        try:
+            gdown.download(id=gdrive_id, output=output_path, quiet=False)
+            log.info(f"✓ Downloaded {output_path}")
+        except Exception as e:
+            log.error(f"Failed to download {output_path}: {e}")
+            raise
 
+# Model file IDs from your Google Drive links
+RASNET_ID = "1OiM6c-tVS6rPdJdBBG0I2I_kvs5QwkR3"
+VGG16_ID = "1ZOIQjp_GMg3EGT6bCfK-HlGW8e6DV4St"
+
+# Download models before loading
+download_model(RASNET_ID, 'rasnet50_model.h5')
+download_model(VGG16_ID, 'vgg16_model.h5')
+
+# Load models
 log.info("Loading models...")
 try:
     model1 = tf.keras.models.load_model('rasnet50_model.h5', compile=False)
@@ -57,7 +75,7 @@ MODEL_CONFIG = {
     "model1": {
         "preprocess": "resnet",
         "positive_class": "Non-Autistic",
-        "threshold_autistic": 0.40,  # Wider separation
+        "threshold_autistic": 0.40,
         "threshold_non_autistic": 0.60,
         "tta": True,
         "tta_count": 8,
@@ -76,9 +94,9 @@ MODEL_CONFIG = {
 
 # OPTIMIZED TIERS - More decisive predictions
 CONFIDENCE_TIERS = {
-    "high": 0.68,  # Lowered from 0.78
-    "medium": 0.56,  # Lowered from 0.62
-    "low": 0.46  # Lowered from 0.52
+    "high": 0.68,
+    "medium": 0.56,
+    "low": 0.46
 }
 
 SAFETY_CONFIG = {
@@ -102,7 +120,6 @@ SAFETY_CONFIG = {
     "detection_order": ["mtcnn", "dnn", "haar"]
 }
 
-
 # ---- FACE DETECTORS ----
 
 def _load_haar_cascade():
@@ -113,7 +130,6 @@ def _load_haar_cascade():
         return haar
     log.warning("✗ Haar cascade unavailable")
     return None
-
 
 def _load_dnn_detector():
     try:
@@ -136,7 +152,6 @@ def _load_dnn_detector():
         log.warning(f"✗ DNN detector unavailable: {e}")
         return None
 
-
 def _load_mtcnn_detector():
     if MTCNN_AVAILABLE:
         try:
@@ -148,15 +163,12 @@ def _load_mtcnn_detector():
             return None
     return None
 
-
 HAAR_DET = _load_haar_cascade()
 DNN_DET = _load_dnn_detector()
 MTCNN_DET = _load_mtcnn_detector()
 
-
 def adversarial_defense(pil_img):
     return pil_img.filter(ImageFilter.GaussianBlur(radius=0.5))
-
 
 def smart_resize(pil_img):
     w, h = pil_img.size
@@ -172,7 +184,6 @@ def smart_resize(pil_img):
         log.info(f"Resized from {w}x{h} to {new_w}x{new_h}")
 
     return pil_img, resized
-
 
 # ---- FACE DETECTION ----
 
@@ -192,7 +203,6 @@ def detect_faces_mtcnn(pil_img):
     except Exception as e:
         log.warning(f"MTCNN detection failed: {e}")
         return []
-
 
 def detect_faces_dnn(pil_img):
     if DNN_DET is None:
@@ -217,7 +227,6 @@ def detect_faces_dnn(pil_img):
     except Exception as e:
         log.warning(f"DNN detection failed: {e}")
         return []
-
 
 def detect_faces_haar(pil_img):
     if HAAR_DET is None or HAAR_DET.empty():
@@ -271,7 +280,6 @@ def detect_faces_haar(pil_img):
     log.info(f"Haar detected {len(boxes)} faces")
     return boxes
 
-
 def detect_faces_pil(pil_img):
     detection_order = SAFETY_CONFIG.get("detection_order", ["mtcnn", "dnn", "haar"])
 
@@ -296,13 +304,11 @@ def detect_faces_pil(pil_img):
     log.warning("No faces detected by any algorithm")
     return []
 
-
 def crop_to_largest_face(pil_img, boxes):
     if not boxes:
         return pil_img
     (x1, y1, x2, y2) = max(boxes, key=lambda b: (b[2] - b[0]) * (b[3] - b[1]))
     return pil_img.crop((x1, y1, x2, y2))
-
 
 # ---- HUMAN FACE VERIFICATION ----
 
@@ -310,7 +316,6 @@ def check_sharpness(img_array):
     gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
     lap_var = cv2.Laplacian(gray, cv2.CV_64F).var()
     return float(lap_var)
-
 
 def check_skin_tone(img_array):
     ycrcb = cv2.cvtColor(img_array, cv2.COLOR_RGB2YCrCb)
@@ -320,13 +325,11 @@ def check_skin_tone(img_array):
     skin_ratio = np.sum(mask > 0) / (mask.shape[0] * mask.shape[1])
     return float(skin_ratio)
 
-
 def check_edge_density(img_array):
     gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
     edges = cv2.Canny(gray, 50, 150)
     edge_ratio = np.sum(edges > 0) / (edges.shape[0] * edges.shape[1])
     return float(edge_ratio)
-
 
 def check_color_variance(img_array):
     var_r = np.var(img_array[:, :, 0])
@@ -334,7 +337,6 @@ def check_color_variance(img_array):
     var_b = np.var(img_array[:, :, 2])
     total_var = var_r + var_g + var_b
     return float(total_var)
-
 
 def verify_human_face(pil_img, face_box):
     if not SAFETY_CONFIG["human_face_check"]:
@@ -427,7 +429,6 @@ def verify_human_face(pil_img, face_box):
 
     return is_human, confidence_score, issues
 
-
 # ---- PREDICTION FUNCTIONS ----
 
 def predictive_entropy(vec):
@@ -439,7 +440,6 @@ def predictive_entropy(vec):
     v = np.clip(v, 1e-9, 1.0)
     return - float(np.sum(v * np.log(v)))
 
-
 def energy_score(vec):
     logits = np.asarray(vec).reshape(-1)
     if logits.shape[0] == 1:
@@ -447,7 +447,6 @@ def energy_score(vec):
         logit = np.log(p / (1.0 - p))
         return float(logit)
     return float(np.log(np.sum(np.exp(logits))))
-
 
 def prep_array(arr, mode):
     if mode == "rescale":
@@ -458,10 +457,8 @@ def prep_array(arr, mode):
         return resnet_preprocess(arr.astype("float32"))
     return arr
 
-
 def get_hw(model):
     return model.input_shape[1], model.input_shape[2]
-
 
 def _maybe_temperature_scale(p, T):
     if not T or T == 1.0:
@@ -470,7 +467,6 @@ def _maybe_temperature_scale(p, T):
     p = float(min(max(p, eps), 1.0 - eps))
     logit = np.log(p / (1.0 - p))
     return float(1.0 / (1.0 + np.exp(-logit / float(T))))
-
 
 def _apply_tiered_classification(p_pos, cfg, model_key):
     thr_a = float(cfg.get("threshold_autistic", 0.5))
@@ -522,11 +518,9 @@ def _apply_tiered_classification(p_pos, cfg, model_key):
     log.info(f"[{model_key}] p_pos={p_pos:.4f} -> {final_label} (conf={conf:.4f}, tier={tier})")
     return final_label, conf, a_pct, n_pct, true_labels, tier
 
-
 def _predict_core(arr_batched, model):
     pred = model.predict(arr_batched, verbose=0)[0]
     return np.asarray(pred).reshape(-1)
-
 
 def _tta_views_enhanced(img, w, h, count=8):
     base = np.array(img.resize((w, h)))
@@ -548,7 +542,6 @@ def _tta_views_enhanced(img, w, h, count=8):
         views.append(np.array(bright))
 
     return views[:count]
-
 
 def predict_with_model(img, model, cfg, model_key):
     h, w = get_hw(model)
@@ -632,7 +625,6 @@ def predict_with_model(img, model, cfg, model_key):
 
     return result
 
-
 # OPTIMIZED ENSEMBLE - Better confidence boost
 def ensemble_predictions(res1, res2):
     c1, c2 = res1.get("confidence", 0.5), res2.get("confidence", 0.5)
@@ -647,7 +639,6 @@ def ensemble_predictions(res1, res2):
     base1, base2 = extract_base(l1), extract_base(l2)
 
     if base1 == base2:
-        # MODELS AGREE - Give 20% confidence boost!
         avg_conf = (c1 + c2) / 2.0
         avg_conf = min(avg_conf * 1.20, 1.0)
 
@@ -669,8 +660,7 @@ def ensemble_predictions(res1, res2):
             "confidence": avg_conf,
             "confidence_tier": final_tier,
             "autistic_percentage": (res1.get("autistic_percentage", 0) + res2.get("autistic_percentage", 0)) / 2,
-            "non_autistic_percentage": (res1.get("non_autistic_percentage", 0) + res2.get("non_autistic_percentage",
-                                                                                          0)) / 2,
+            "non_autistic_percentage": (res1.get("non_autistic_percentage", 0) + res2.get("non_autistic_percentage", 0)) / 2,
             "ensemble_method": "weighted_vote_agree"
         }
 
@@ -684,7 +674,6 @@ def ensemble_predictions(res1, res2):
 
         return result
     else:
-        # MODELS DISAGREE - Use stronger weighting
         w1 = c1 ** 2.2
         w2 = c2 ** 2.2
         total_w = w1 + w2
@@ -725,7 +714,6 @@ def ensemble_predictions(res1, res2):
             result["ood_warning"] = " | ".join(ood_warns)
 
         return result
-
 
 def predict_image(image_path, model_choice="both"):
     try:
@@ -802,16 +790,13 @@ def predict_image(image_path, model_choice="both"):
         log.error(f"Prediction error: {e}")
         return {"error": f"Prediction error: {str(e)}"}
 
-
 @app.route('/')
 def index():
     return render_template('index.html')
 
-
 @app.route('/resize')
 def resize_page():
     return render_template('resize.html')
-
 
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -862,13 +847,8 @@ def predict():
         log.error(f"Server error: {e}")
         return jsonify({'error': f'Server error: {str(e)}'})
 
-
 # if __name__ == '__main__':
 #     app.run(debug=True, host='0.0.0.0', port=5000, threaded=True)
-
-# if __name__ == '__main__':
-#     app.run(host='0.0.0.0', port=5000)
 if __name__ == '__main__':
-    import os
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port)
