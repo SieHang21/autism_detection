@@ -41,34 +41,52 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# ===== DOWNLOAD MODELS FROM GOOGLE DRIVE =====
-def download_model(gdrive_id, output_path):
-    if not os.path.exists(output_path):
-        log.info(f"Downloading {output_path} from Google Drive...")
-        try:
-            gdown.download(id=gdrive_id, output=output_path, quiet=False)
-            log.info(f"✓ Downloaded {output_path}")
-        except Exception as e:
-            log.error(f"Failed to download {output_path}: {e}")
-            raise
+# # ===== DOWNLOAD MODELS FROM GOOGLE DRIVE =====
+import gdown
+
+def download_model_from_gdrive(file_id, output_path):
+    """Download model from Google Drive with proper error handling"""
+    if os.path.exists(output_path):
+        log.info(f"✓ Model {output_path} already exists, skipping download")
+        return True
+    
+    try:
+        log.info(f"Downloading {output_path} from Google Drive (this may take 2-5 minutes)...")
+        url = f"https://drive.google.com/uc?id={file_id}"
+        gdown.download(url, output_path, quiet=False)
+        
+        if os.path.exists(output_path):
+            log.info(f"✓ Successfully downloaded {output_path}")
+            return True
+        else:
+            log.error(f"✗ Download failed: {output_path} not found after download")
+            return False
+    except Exception as e:
+        log.error(f"✗ Failed to download {output_path}: {str(e)}")
+        return False
 
 # Model file IDs from your Google Drive links
 RASNET_ID = "1OiM6c-tVS6rPdJdBBG0I2I_kvs5QwkR3"
 VGG16_ID = "1ZOIQjp_GMg3EGT6bCfK-HlGW8e6DV4St"
 
 # Download models before loading
-download_model(RASNET_ID, 'rasnet50_model.h5')
-download_model(VGG16_ID, 'vgg16_model.h5')
+log.info("Checking for model files...")
+rasnet_success = download_model_from_gdrive(RASNET_ID, 'rasnet50_model.h5')
+vgg16_success = download_model_from_gdrive(VGG16_ID, 'vgg16_model.h5')
 
-# Load models
-log.info("Loading models...")
-try:
-    model1 = tf.keras.models.load_model('rasnet50_model.h5', compile=False)
-    model2 = tf.keras.models.load_model('vgg16_model.h5', compile=False)
-    log.info(f"Model 1 input: {model1.input_shape}, VGG16 input: {model2.input_shape}")
-except Exception as e:
-    log.error(f"Model load error: {e}")
+if not rasnet_success or not vgg16_success:
+    log.error("Failed to download models from Google Drive. Please check file permissions.")
     model1, model2 = None, None
+else:
+    # Load models only if download succeeded
+    log.info("Loading models...")
+    try:
+        model1 = tf.keras.models.load_model('rasnet50_model.h5', compile=False)
+        model2 = tf.keras.models.load_model('vgg16_model.h5', compile=False)
+        log.info(f"Model 1 input: {model1.input_shape}, VGG16 input: {model2.input_shape}")
+    except Exception as e:
+        log.error(f"Model load error: {e}")
+        model1, model2 = None, None
 
 # OPTIMIZED CONFIG - Better confidence distribution
 MODEL_CONFIG = {
