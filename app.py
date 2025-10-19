@@ -13,6 +13,8 @@ from tensorflow.keras.applications.vgg16 import preprocess_input as vgg16_prepro
 from tensorflow.keras.applications.resnet import preprocess_input as resnet_preprocess
 import cv2
 import gdown
+import requests
+import os
 
 try:
     from mtcnn import MTCNN
@@ -42,27 +44,71 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # # ===== DOWNLOAD MODELS FROM GOOGLE DRIVE =====
-import gdown
+
 
 def download_model_from_gdrive(file_id, output_path):
-    """Download model from Google Drive with proper error handling"""
+    """Download model from Google Drive with proper error handling and progress tracking"""
     if os.path.exists(output_path):
-        log.info(f"✓ Model {output_path} already exists, skipping download")
+        file_size = os.path.getsize(output_path) / (1024 * 1024)
+        log.info(f"✓ Model {output_path} already exists ({file_size:.1f} MB), skipping download")
         return True
     
     try:
         log.info(f"Downloading {output_path} from Google Drive (this may take 2-5 minutes)...")
-        url = f"https://drive.google.com/uc?export=download&id={file_id}"
-        gdown.download(url, output_path, quiet=False, fuzzy=True)
         
-        if os.path.exists(output_path):
-            log.info(f"✓ Successfully downloaded {output_path}")
-            return True
+        # Use direct download URL for large files with confirmation token
+        url = f"https://drive.google.com/uc?export=download&id={file_id}&confirm=t"
+        
+        session = requests.Session()
+        response = session.get(url, stream=True, timeout=300)
+        
+        # Check for virus scan warning page (large files)
+        if 'download_warning' in response.text or 'virus scan' in response.text.lower():
+            log.info("Handling virus scan warning...")
+            # Get the confirmation token
+            for key, value in response.cookies.items():
+                if key.startswith('download_warning'):
+                    url = f"https://drive.google.com/uc?export=download&id={file_id}&confirm={value}"
+                    response = session.get(url, stream=True, timeout=300)
+                    break
+        
+        if response.status_code == 200:
+            total_size = int(response.headers.get('content-length', 0))
+            downloaded = 0
+            
+            with open(output_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=1024 * 1024):  # 1MB chunks
+                    if chunk:
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        if total_size > 0:
+                            progress = (downloaded / total_size) * 100
+                            log.info(f"Progress: {progress:.1f}% ({downloaded / (1024*1024):.1f}/{total_size / (1024*1024):.1f} MB)")
+            
+            # Verify download
+            if os.path.exists(output_path):
+                file_size = os.path.getsize(output_path)
+                if file_size > 1000000:  # > 1MB
+                    log.info(f"✓ Successfully downloaded {output_path} ({file_size / (1024*1024):.1f} MB)")
+                    return True
+                else:
+                    log.error(f"✗ Download failed: file too small ({file_size} bytes)")
+                    os.remove(output_path)
+                    return False
+            else:
+                log.error(f"✗ Download failed: file not found after download")
+                return False
         else:
-            log.error(f"✗ Download failed: {output_path} not found after download")
+            log.error(f"✗ Download failed with HTTP status {response.status_code}")
             return False
+            
+    except requests.exceptions.Timeout:
+        log.error(f"✗ Download timeout for {output_path}")
+        return False
     except Exception as e:
         log.error(f"✗ Failed to download {output_path}: {str(e)}")
+        if os.path.exists(output_path):
+            os.remove(output_path)
         return False
 
 # Model file IDs from your Google Drive links
@@ -71,22 +117,28 @@ VGG16_ID = "1ZOIQjp_GMg3EGT6bCfK-HlGW8e6DV4St"
 
 # Download models before loading
 log.info("Checking for model files...")
-rasnet_success = download_model_from_gdrive(RASNET_ID, 'rasnet50_model.h5')
-vgg16_success = download_model_from_gdrive(VGG16_ID, 'vgg16_model.h5')
 
-if not rasnet_success or not vgg16_success:
-    log.error("Failed to download models from Google Drive. Please check file permissions.")
-    model1, model2 = None, None
-else:
-    # Load models only if download succeeded
-    log.info("Loading models...")
-    try:
+try:
+    rasnet_success = download_model_from_gdrive(RASNET_ID, 'rasnet50_model.h5')
+    vgg16_success = download_model_from_gdrive(VGG16_ID, 'vgg16_model.h5')
+    
+    if not rasnet_success or not vgg16_success:
+        log.error("Failed to download models from Google Drive. Please check file permissions.")
+        log.error("Ensure files are shared with 'Anyone with the link' access.")
+        model1, model2 = None, None
+    else:
+        # Load models only if download succeeded
+        log.info("Loading models into TensorFlow...")
         model1 = tf.keras.models.load_model('rasnet50_model.h5', compile=False)
         model2 = tf.keras.models.load_model('vgg16_model.h5', compile=False)
-        log.info(f"Model 1 input: {model1.input_shape}, VGG16 input: {model2.input_shape}")
-    except Exception as e:
-        log.error(f"Model load error: {e}")
-        model1, model2 = None, None
+        log.info(f"✓ Models loaded successfully")
+        log.info(f"  - Model 1 input shape: {model1.input_shape}")
+        log.info(f"  - VGG16 input shape: {model2.input_shape}")
+        
+except Exception as e:
+    log.error(f"Critical error during model initialization: {e}")
+    model1, model2 = None, None
+
 
 # OPTIMIZED CONFIG - Better confidence distribution
 MODEL_CONFIG = {
@@ -865,8 +917,8 @@ def predict():
         log.error(f"Server error: {e}")
         return jsonify({'error': f'Server error: {str(e)}'})
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000, threaded=True)
 # if __name__ == '__main__':
-#     port = int(os.environ.get('PORT', 10000))
-#     app.run(host='0.0.0.0', port=port)
+#     app.run(debug=True, host='0.0.0.0', port=5000, threaded=True)
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port)
