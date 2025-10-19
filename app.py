@@ -12,7 +12,7 @@ import tensorflow as tf
 from tensorflow.keras.applications.vgg16 import preprocess_input as vgg16_preprocess
 from tensorflow.keras.applications.resnet import preprocess_input as resnet_preprocess
 import cv2
-import gdown
+#import gdown
 import requests
 import os
 
